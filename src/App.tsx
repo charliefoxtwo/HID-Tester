@@ -17,19 +17,21 @@ export default class App extends Component<unknown, AppState> {
     }
 
     public override componentDidMount() {
-        navigator.hid.getDevices().then(d => this.setState({ devices: d }));
+        try {
+            navigator.hid.getDevices().then(d => this.setState({ devices: d }));
 
-        if (!this.state.devices) return;
+            if (!this.state.devices) return;
 
-        Promise.all(this.state.devices?.map(d => d.open())).then(x => console.log("opened existing devices"));
+            Promise.all(this.state.devices?.map(d => d.open())).then(() => console.log("opened existing devices"));
+        } catch (e) {
+            console.error("Unable to retrieve devices (unsupported browser?)");
+        }
     }
 
     private async loadTheStuff(): Promise<void> {
-        const filters: HIDDeviceFilter[] = [];
-
         const devices = (
             await navigator.hid.requestDevice({
-                filters: filters,
+                filters: [],
             })
         ).filter(d => d.collections.filter(c => c.featureReports?.length ?? 0 > 0).length > 0);
 
@@ -40,7 +42,6 @@ export default class App extends Component<unknown, AppState> {
         }
 
         this.setState({ devices: [...(this.state.devices ?? []), ...devices] });
-        console.log(`added ${devices.length} devices`);
     }
 
     private async clearTheStuff(): Promise<void> {
