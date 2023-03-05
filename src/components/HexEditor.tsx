@@ -3,14 +3,16 @@ import Grid2 from "@mui/material/Unstable_Grid2";
 import React, { Component, ReactNode } from "react";
 
 const style: SxProps = {
-    font: "monospace 18px white",
+    "& .MuiInputBase-input": {
+        fontFamily: ["monospace"].join(","),
+    },
 };
 
 export default class HexEditor extends Component<HexEditorProps, HexEditorState> {
     constructor(props: HexEditorProps) {
         super(props);
 
-        this.state = { valid: props.maxBytes === undefined, text: "" };
+        this.state = { valid: true, text: "", rawText: "" };
 
         this.textInput = this.textInput.bind(this);
         this.callback = this.callback.bind(this);
@@ -19,7 +21,9 @@ export default class HexEditor extends Component<HexEditorProps, HexEditorState>
     }
 
     private isInLengthBounds(text: string): boolean {
-        return this.props.maxBytes === undefined ? true : text.length === this.maxTextLength;
+        return (
+            (this.props.maxBytes === undefined ? true : text.length <= this.maxTextLength * 2) && text.length % 2 === 0
+        );
     }
 
     private isValidFormat(text: string): boolean {
@@ -27,8 +31,29 @@ export default class HexEditor extends Component<HexEditorProps, HexEditorState>
     }
 
     private textInput(event: React.ChangeEvent<HTMLInputElement>): void {
-        const text = event.target.value.replaceAll(" ", "").replaceAll("\n", "");
-        this.setState({ text: text, valid: this.isInLengthBounds(text) && this.isValidFormat(text) }, this.callback);
+        let rawText = event.target.value;
+        const text = rawText.replaceAll(" ", "").replaceAll("\n", "");
+
+        if (!this.isValidFormat(text) || (this.props.maxBytes && text.length > this.props.maxBytes * 2)) {
+            this.setState({ rawText: this.state.rawText });
+            return;
+        } else if (text.length > 2) {
+            if (text.length % 2 == 1 && rawText[rawText.length - 2] !== " ") {
+                rawText = `${rawText.substring(0, rawText.length - 1)} ${rawText.substring(rawText.length - 1)}`;
+            }
+        } else if ((text.length % 2 === 1 || text.length === 0) && rawText.endsWith(" ")) {
+            rawText = rawText.trimEnd();
+        }
+
+        rawText = text.match(/.{1,2}/g)?.join(" ") ?? "";
+        this.setState(
+            {
+                text: text,
+                rawText: rawText,
+                valid: this.isInLengthBounds(text) && this.isValidFormat(text),
+            },
+            this.callback,
+        );
     }
 
     private callback(): void {
@@ -38,7 +63,7 @@ export default class HexEditor extends Component<HexEditorProps, HexEditorState>
     }
 
     private get maxTextLength() {
-        return (this.props.maxBytes ?? 0) * 2;
+        return this.props.maxBytes ?? 0;
     }
     /*
      * sample text:
@@ -47,9 +72,36 @@ export default class HexEditor extends Component<HexEditorProps, HexEditorState>
      * 0020   00 00 00 00 00 f0
      * */
     public render(): ReactNode {
+        const { rawText, text } = this.state;
+        const ghostText = "00";
+        let ghostString = rawText;
+
+        const totalUsefulChars = text.length;
+        const remainingGhostBytes = (this.props.maxBytes ?? 0) - Math.ceil(totalUsefulChars / 2);
+
+        ghostString =
+            remainingGhostBytes < 0
+                ? ""
+                : `${ghostString}${
+                      totalUsefulChars % 2 === 1 ? "0 " : rawText.endsWith(" ") || rawText.length === 0 ? "" : " "
+                  }${Array(remainingGhostBytes).fill(ghostText).join(" ")}`;
+
         return (
             <Box sx={{ position: "relative" }}>
-                <Grid2 xs={12}>
+                <Grid2 xs={12} sx={{ zIndex: 1 }}>
+                    <TextField
+                        multiline
+                        fullWidth
+                        error={!this.state.valid}
+                        spellCheck={false}
+                        sx={style}
+                        style={{ zIndex: 1 }}
+                        onInput={this.textInput}
+                        minRows={4}
+                        value={this.state.rawText}
+                    />
+                </Grid2>
+                <Grid2 xs={12} sx={{ zIndex: 0, position: "absolute", top: 0, right: 0 }}>
                     <TextField
                         multiline
                         fullWidth
@@ -58,12 +110,19 @@ export default class HexEditor extends Component<HexEditorProps, HexEditorState>
                         sx={style}
                         onInput={this.textInput}
                         minRows={4}
+                        disabled
+                        style={{ zIndex: 0 }}
+                        value={ghostString}
                     />
                 </Grid2>
                 <Box sx={{ position: "absolute", bottom: ".5rem", right: ".8rem" }}>
-                    <Typography sx={{ color: "gray" }}>
+                    <Typography
+                        sx={{
+                            color: Math.floor(this.state.text.length / 2) === this.maxTextLength ? "primary" : "gray",
+                        }}
+                    >
                         <code>
-                            {this.state.text.length}
+                            {Math.floor(this.state.text.length / 2)}
                             {this.props.maxBytes !== undefined && `/${this.maxTextLength}`}
                         </code>
                     </Typography>
@@ -81,4 +140,5 @@ interface HexEditorProps {
 interface HexEditorState {
     valid: boolean;
     text: string;
+    rawText: string;
 }
