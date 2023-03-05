@@ -26,6 +26,10 @@ export default class DeviceListItem extends Component<DeviceListItemProps, Devic
             .filter(DeviceListItem.notEmpty);
     }
 
+    private get inputsToUse(): HIDReportInfo[] {
+        return this.props.device.collections.flatMap(c => c.inputReports ?? []).filter(DeviceListItem.notEmpty);
+    }
+
     public render(): ReactNode {
         const { device, onSelection } = this.props;
         const { open } = this.state;
@@ -51,6 +55,15 @@ export default class DeviceListItem extends Component<DeviceListItemProps, Devic
                         {/*>*/}
                         {/*    <ListItemText primary={"Custom"} />*/}
                         {/*</ListItemButton>*/}
+                        {this.inputsToUse.length > 0 && (
+                            <ListItemButton
+                                selected={this.props.inputSelected}
+                                sx={{ pl: 4 }}
+                                onClick={() => this.props.onInputSelection(device, this.inputsToUse)}
+                            >
+                                <ListItemText primary={`View inputs`} />
+                            </ListItemButton>
+                        )}
                         {this.reportsToUse.map((r, i) => (
                             <ListItemButton
                                 key={i}
@@ -58,7 +71,7 @@ export default class DeviceListItem extends Component<DeviceListItemProps, Devic
                                 sx={{ pl: 4 }}
                                 onClick={() => onSelection(device, r)}
                             >
-                                <ListItemText primary={`0x${("00" + r.reportId?.toString(16)).slice(-2)}`} />
+                                <ListItemText primary={`Feature 0x${("00" + r.reportId?.toString(16)).slice(-2)}`} />
                             </ListItemButton>
                         ))}
                         {this.reportsToUse.length === 0 && (
@@ -76,7 +89,9 @@ export default class DeviceListItem extends Component<DeviceListItemProps, Devic
 interface DeviceListItemProps {
     device: HIDDevice;
     onSelection: (device: HIDDevice, reportInfo: HIDReportInfo) => void;
+    onInputSelection: (device: HIDDevice, inputInfo: HIDReportInfo[]) => void;
     selectedDeviceReportId?: number;
+    inputSelected?: boolean;
 }
 
 interface DeviceListItemState {

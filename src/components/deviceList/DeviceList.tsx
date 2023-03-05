@@ -8,6 +8,7 @@ export default class DeviceList extends Component<DeviceListProps, DeviceListSta
         super(props);
         this.state = {};
         this.onSelection = this.onSelection.bind(this);
+        this.onInputSelection = this.onInputSelection.bind(this);
     }
 
     // private async removeDevice(device: HIDDevice): Promise<void> {}
@@ -16,18 +17,34 @@ export default class DeviceList extends Component<DeviceListProps, DeviceListSta
         this.setState({
             selectedDeviceVid: device.vendorId,
             selectedDevicePid: device.productId,
-            selectedDeviceReportId: reportInfo.reportId!,
+            selectedDeviceReportId: reportInfo?.reportId,
+            inputSelected: false,
         });
         this.props.onSelection(device, reportInfo);
     }
 
-    public render(): ReactNode {
+    private onInputSelection(device: HIDDevice, inputInfos: HIDReportInfo[]): void {
+        this.setState({
+            selectedDeviceVid: device.vendorId,
+            selectedDevicePid: device.productId,
+            selectedDeviceReportId: undefined,
+            inputSelected: true,
+        });
+        this.props.onInputSelection(device, inputInfos);
+    }
+
+    private get featureDevices(): HIDDevice[] {
         const { devices } = this.props;
-        const { selectedDeviceVid, selectedDevicePid, selectedDeviceReportId } = this.state;
+
+        return devices.filter(d => d.collections.filter(c => c.featureReports?.length ?? 0 > 0).length > 0);
+    }
+
+    public render(): ReactNode {
+        const { selectedDeviceVid, selectedDevicePid, selectedDeviceReportId, inputSelected } = this.state;
 
         return (
             <List sx={{ width: "100%" }}>
-                {devices.map((d, i) => (
+                {this.featureDevices.map((d, i) => (
                     <DeviceListItem
                         key={i}
                         device={d}
@@ -36,7 +53,11 @@ export default class DeviceList extends Component<DeviceListProps, DeviceListSta
                                 ? selectedDeviceReportId
                                 : undefined
                         }
+                        inputSelected={
+                            d.vendorId === selectedDeviceVid && d.productId === selectedDevicePid && inputSelected
+                        }
                         onSelection={this.onSelection}
+                        onInputSelection={this.onInputSelection}
                     />
                 ))}
             </List>
@@ -47,10 +68,12 @@ export default class DeviceList extends Component<DeviceListProps, DeviceListSta
 interface DeviceListProps {
     devices: HIDDevice[];
     onSelection: (device: HIDDevice, reportInfo: HIDReportInfo) => void;
+    onInputSelection: (device: HIDDevice, inputInfos: HIDReportInfo[]) => void;
 }
 
 interface DeviceListState {
     selectedDeviceVid?: number;
     selectedDevicePid?: number;
     selectedDeviceReportId?: number;
+    inputSelected?: boolean;
 }
